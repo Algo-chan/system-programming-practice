@@ -6,6 +6,7 @@ SRCDIR  = src
 OBJDIR  = obj
 BINDIR  = bin
 TARGET  = $(BINDIR)/process-manager
+TESTDIR = test_programs
 
 SRCS    = $(SRCDIR)/main.c          \
           $(SRCDIR)/process_manager.c \
@@ -16,14 +17,15 @@ SRCS    = $(SRCDIR)/main.c          \
 
 OBJS    = $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 
-.PHONY: all clean directories
+TEST_SRCS = $(wildcard $(TESTDIR)/*.c)
+TEST_BINS = $(TEST_SRCS:$(TESTDIR)/%.c=$(TESTDIR)/%.out)
 
-all: directories $(TARGET)
+.PHONY: all clean test directories
+
+all: directories $(TARGET) $(TEST_BINS)
 
 directories:
-	@if not exist "$(OBJDIR)" mkdir "$(OBJDIR)"
-	@if not exist "$(BINDIR)" mkdir "$(BINDIR)"
-	@if not exist "logs" mkdir logs
+	mkdir -p $(OBJDIR) $(BINDIR) logs
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) $(INCDIR) -c $< -o $@
@@ -31,7 +33,13 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(INCDIR) -o $@ $^ $(LDFLAGS)
 
+$(TESTDIR)/%.out: $(TESTDIR)/%.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+test: all
+	@echo ""
+	@echo "=== Running process-manager (press Ctrl+C to stop) ==="
+	./$(TARGET)
+
 clean:
-	@if exist "$(OBJDIR)" rmdir /s /q "$(OBJDIR)"
-	@if exist "$(BINDIR)" rmdir /s /q "$(BINDIR)"
-	@del /q logs\*.log 2>nul || ver>nul
+	rm -rf $(OBJDIR) $(BINDIR) $(TESTDIR)/*.out logs/*.log
