@@ -34,7 +34,6 @@ typedef struct {
     int            count;
     int            running;
     int            restart_all;
-    int            sigchld_pending;
 } ProcessManager;
 
 int  pm_init(ProcessManager *pm);

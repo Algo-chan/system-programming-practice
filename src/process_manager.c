@@ -12,7 +12,6 @@ int pm_init(ProcessManager *pm)
     pm->running     = 1;
     pm->restart_all = 0;
     pm->count       = 0;
-    pm->sigchld_pending = 0;
     log_write(LOG_INFO, "Process manager initialised");
     return 0;
 }
@@ -304,7 +303,6 @@ void pm_check_children(ProcessManager *pm)
             log_write(LOG_WARN, "Reaped unknown child pid %d", pid);
     }
 
-    pm->sigchld_pending = 0;
 }
 
 void pm_shutdown(ProcessManager *pm)

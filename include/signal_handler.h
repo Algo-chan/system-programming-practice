@@ -6,4 +6,6 @@
 int  signal_setup(ProcessManager *pm);
 void signal_teardown(void);
 
+extern volatile sig_atomic_t g_sigchld_flag;
+
 #endif
