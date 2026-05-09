@@ -5,6 +5,7 @@
 #include "daemon.h"
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 #include <stdlib.h>
 
 static ProcessManager pm;
