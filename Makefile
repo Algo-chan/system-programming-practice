@@ -2,11 +2,11 @@ CC      = gcc
 CFLAGS  = -Wall -Wextra -pedantic -std=c11 -g -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
 LDFLAGS =
 BINDIR  = bin
-SRC     = process-manager.c
+SRC     = process_manager.c
 TESTDIR = test_programs
 
-TARGET_SUPERVISOR = $(BINDIR)/process-manager
-TARGET_CLEAN      = $(BINDIR)/process-manager-clean
+TARGET_SUPERVISOR = $(BINDIR)/process_manager
+TARGET_CLEAN      = $(BINDIR)/process_manager-clean
 
 TEST_SRCS = $(wildcard $(TESTDIR)/*.c)
 TEST_BINS = $(TEST_SRCS:$(TESTDIR)/%.c=$(TESTDIR)/%.out)
@@ -14,16 +14,13 @@ TEST_BINS = $(TEST_SRCS:$(TESTDIR)/%.c=$(TESTDIR)/%.out)
 .PHONY: all clean test test-verbose clean-mode test-clean test-clean-verbose \
         directories build supervisor-mode
 
-# Default: build BOTH modes
 all: directories $(TARGET_SUPERVISOR) $(TARGET_CLEAN) test-programs
 
-# Supervisor mode (default, no extra flag)
 supervisor-mode: directories $(TARGET_SUPERVISOR) test-programs
 
 $(TARGET_SUPERVISOR): $(SRC)
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-# Clean mode (compile with -DCLEAN_MODE)
 clean-mode: directories $(TARGET_CLEAN) test-programs
 
 $(TARGET_CLEAN): $(SRC)
@@ -36,8 +33,6 @@ $(TESTDIR)/%.out: $(TESTDIR)/%.c
 
 directories:
 	mkdir -p $(BINDIR) logs
-
-# ---- Test targets ----
 
 test: supervisor-mode
 	@echo ""
@@ -73,24 +68,22 @@ build: all
 	@echo "  tests:      $(TEST_BINS)"
 
 clean:
-	rm -rf $(BINDIR) $(TESTDIR)/*.out logs/*.log process-manager.exe
-
-# ======== Diagnostics ========
+	rm -rf $(BINDIR) $(TESTDIR)/*.out logs/*.log process_manager.exe
 
 .PHONY: ps-check pstree-check pgrep-check log-check log-tail kill-all
 
 ps-check:
-	@echo "=== process-manager processes ==="
-	ps aux | grep -E '[p]rocess-manager|[s]leeper|[c]rasher|[s]tatus_printer' || echo "(none)"
+	@echo "=== process_manager processes ==="
+	ps aux | grep -E '[p]rocess_manager|[s]leeper|[c]rasher|[s]tatus_printer' || echo "(none)"
 
 pstree-check:
 	@echo "=== process tree ==="
-	PID=$$(pgrep -x process-manager 2>/dev/null); \
+	PID=$$(pgrep -x process_manager 2>/dev/null); \
 	if [ -n "$$PID" ]; then pstree -p $$PID; \
 	else echo "(not running)"; fi
 
 pgrep-check:
-	@for p in process-manager sleeper crasher status_printer; do \
+	@for p in process_manager sleeper crasher status_printer; do \
 		echo "  $$p: $$(pgrep -a $$p 2>/dev/null || echo '(not found)')"; \
 	done
 
@@ -102,15 +95,13 @@ log-tail:
 	tail -f logs/manager.log 2>/dev/null || echo "(not found)"
 
 kill-all:
-	-pkill -x process-manager process-manager-clean 2>/dev/null; \
+	-pkill -x process_manager process_manager-clean 2>/dev/null; \
 	pkill -x sleeper crasher status_printer 2>/dev/null; \
 	echo "Killed all"; sleep 1; make ps-check
-
-# ======== PDEATHSIG demo ========
 
 .PHONY: demo-pdeathsig
 
 demo-pdeathsig: test-clean-verbose
 	@echo ""
-	@echo "In another terminal, run:  kill -9 \$$\$$(pgrep -x process-manager-clean)"
+	@echo "In another terminal, run:  kill -9 \$$\$$(pgrep -x process_manager-clean)"
 	@echo "Then:  pgrep -a sleeper   (should show nothing)"
