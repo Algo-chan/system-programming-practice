@@ -546,13 +546,42 @@ static int compute_backoff_ms(Worker *w)
     return (int)(d > MAX_BACKOFF_MS ? MAX_BACKOFF_MS : d);
 }
 
+static int is_clean_exit(int status)
+{
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
 static int should_restart(Worker *w, int status)
 {
-    if (w->policy == POLICY_NEVER) return 0;
+    if (is_clean_exit(status)) {
+        log_write(LOG_DEBUG, "POLICY: '%s' clean exit (code=0) -> NEVER restart",
+                  w->name);
+        return 0;
+    }
+
+    if (w->policy == POLICY_NEVER) {
+        log_write(LOG_DEBUG, "POLICY: '%s' policy=NEVER -> no restart", w->name);
+        return 0;
+    }
+
     if (w->policy == POLICY_ON_FAILURE) {
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 0) return 0;
+        if (WIFSIGNALED(status)) {
+            log_write(LOG_DEBUG, "POLICY: '%s' policy=ON_FAILURE, signal=%d -> restart",
+                      w->name, WTERMSIG(status));
+            return 1;
+        }
+        log_write(LOG_DEBUG, "POLICY: '%s' policy=ON_FAILURE, exit=%d -> no restart",
+                  w->name, WEXITSTATUS(status));
+        return 0;
+    }
+
+    if (WIFSIGNALED(status)) {
+        log_write(LOG_DEBUG, "POLICY: '%s' policy=ALWAYS, signal=%d -> restart",
+                  w->name, WTERMSIG(status));
         return 1;
     }
+    log_write(LOG_DEBUG, "POLICY: '%s' policy=ALWAYS, exit=%d -> restart",
+              w->name, WEXITSTATUS(status));
     return 1;
 }
 
@@ -570,7 +599,16 @@ static void supervisor_check_children(SupervisorState *s)
             log_exit_reason(w->name, pid, status, LOG_INFO);
             int was_running = (w->state == STATE_RUNNING);
 
-            w->pid = -1; w->state = STATE_CRASHED; w->alive = 0;
+            w->pid = -1; w->alive = 0;
+
+            if (is_clean_exit(status)) {
+                w->state = STATE_STOPPED;
+                log_write(LOG_DEBUG, "CHK: '%s' clean exit code=0 -> STATE_STOPPED, no restart",
+                          w->name);
+                break;
+            }
+
+            w->state = STATE_CRASHED;
 
             if (!was_running || s->shutting_down) {
                 log_write(LOG_DEBUG, "CHK: '%s' not restarted (was_running=%d shutting_down=%d)",
@@ -579,7 +617,8 @@ static void supervisor_check_children(SupervisorState *s)
             }
 
             if (!should_restart(w, status)) {
-                log_write(LOG_INFO, "CHK: '%s' policy=%s prevents restart", w->name, policy_str[w->policy]);
+                log_write(LOG_INFO, "CHK: '%s' policy=%s prevents restart",
+                          w->name, policy_str[w->policy]);
                 break;
             }
 
@@ -631,7 +670,12 @@ static void supervisor_shutdown(SupervisorState *s)
     log_write(LOG_INFO, "SHUTDOWN: stopping supervisor");
     s->shutting_down = 1; s->running = 0;
 
-    kill(0, SIGTERM);
+    for (int i = 0; i < s->count; i++) {
+        if (s->workers[i].state == STATE_RUNNING)
+            kill(s->workers[i].pid, SIGTERM);
+    }
+    usleep(100000);
+
     supervisor_stop_all(s);
     log_write(LOG_INFO, "SHUTDOWN: complete");
 }
@@ -693,7 +737,10 @@ static int run_supervisor_mode(void)
         if (s.restart_all) {
             s.restart_all = 0;
             log_write(LOG_INFO, "SIGHUP: restart-all triggered");
-            kill(0, SIGTERM);
+            for (int i = 0; i < s.count; i++) {
+                if (s.workers[i].state == STATE_RUNNING)
+                    kill(s.workers[i].pid, SIGTERM);
+            }
             usleep(200000);
             supervisor_stop_all(&s);
             usleep(500000);
